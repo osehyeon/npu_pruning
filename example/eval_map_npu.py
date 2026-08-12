@@ -1,0 +1,232 @@
+#!/usr/bin/env python3
+"""NPU 실행 기준 COCO mAP — 실제 배포 형태의 정확도.
+
+CPU uint8 시뮬레이션([eval_map_u8.py])과 달리 **보드에서 실제로 돌린** 결과를 씁니다.
+컴파일러 스케줄링·하드웨어 반올림 차이가 정확도에 영향을 주는지 확인하는 용도입니다.
+
+경로:  이미지 → front ONNX(양자화, CPU) → NPU(.o) → 역양자화 → 디코더 → NMS
+
+    ./run_map_npu.sh                       # 세 모델 (모델당 프로세스 분리)
+    python eval_map_npu.py 40_egs          # 하나만
+
+주의: 한 프로세스에서 두 번째 모델을 로드하면 DMA 오류가 납니다 — run_map_npu.sh 사용.
+"""
+from __future__ import annotations
+
+import argparse
+import contextlib
+import io as _io
+import json
+import os
+import sys
+import time
+from pathlib import Path
+
+import cv2
+import numpy as np
+import onnx
+import onnxruntime as ort
+from decoders import decode_nota, decode_std, nms_per_class
+from onnx import numpy_helper
+from pycocotools.coco import COCO
+from pycocotools.cocoeval import COCOeval
+
+from NeublaDriver import NeublaDriver
+
+HOME = Path.home()
+COCO_IMG = HOME / "datasets/coco/images/val2017"
+COCO_ANN = HOME / "datasets/coco/annotations/instances_val2017.json"
+EX = HOME / "workspace_docs/example"
+SIZE = 608
+
+ORIG_ONNX = HOME / ("demo_1127/yolov3/yolov3_d53_mstrain-608_273e_coco_optim_opset12"
+                    ".neubla_u8_lwq_movingaverage.onnx")
+YV = HOME / "yolo_val"
+NQ_ONNX = YV / "yolov3-mod-precomile-quantize.onnx"
+
+# 후처리 내장 모델은 헤드가 그래프 출력이 아니므로 역양자화 노드를 이름으로 찾습니다.
+#   모델 → {해상도: DequantizeLinear 노드 이름}
+DQ_BY_NAME = {
+    str(ORIG_ONNX): {19: "onnx::Transpose_684_DequantizeLinear",
+                     38: "onnx::Transpose_688_DequantizeLinear",
+                     76: "onnx::Transpose_692_DequantizeLinear"},
+    str(NQ_ONNX):   {19: "convolution_output2_DequantizeLinear",
+                     38: "convolution_output1_DequantizeLinear",
+                     76: "convolution_output_DequantizeLinear"},
+}
+# .back 그래프 → {해상도: 입력 이름}
+BACK_IN = {
+    str(ORIG_ONNX) + ".back": {19: "onnx::Transpose_684",
+                               38: "onnx::Transpose_688",
+                               76: "onnx::Transpose_692"},
+    str(NQ_ONNX) + ".back":   {19: "convolution_output2",
+                               38: "convolution_output1",
+                               76: "convolution_output"},
+}
+
+# 이름 → (양자화 ONNX, NPU 바이너리, 디코더)
+TARGETS = {
+    # Neubla 자체 양자화·자체 컴파일 — 제 fp32 원본과 같은 계보(첫 Conv 상관 +0.9999).
+    # CPU 기준값: resize 36.21 · letterbox 38.26 (둘 다 전체 5,000장)
+    "N_orig":    (NQ_ONNX, YV / "gen_inline_assembly.o", "exp"),
+    "orig_lw":   (ORIG_ONNX, HOME / "demo_1127/yolov3/yolov3_lw.o",      "exp"),
+    "orig_egs":  (ORIG_ONNX, EX / "orig_egs.o",                          "exp"),
+    "40_lw":     (HOME / "demo_0211/pruning_model/40.onnx", HOME / "demo_0211/pruning_model/40.o", "tanh"),
+    "40_egs":    (HOME / "demo_0211/pruning_model/40.onnx", EX / "40_egs.o",  "tanh"),
+    "50_lw":     (HOME / "demo_0211/pruning_model/50.onnx", HOME / "demo_0211/pruning_model/50.o", "tanh"),
+    "50_egs":    (HOME / "demo_0211/pruning_model/50.onnx", EX / "50_egs.o",  "tanh"),
+    # 동일 조건 재양자화(MovingAverage · 배포 캘리브 데이터) — 자체 정합 비교용
+    "R_orig":    (HOME / "workspace_docs/model/u8/original_u8_maD20.onnx", EX / "original_maD20_lw.o", "exp"),
+    "R_40":      (HOME / "workspace_docs/model/u8/pruned40_u8_maD20.onnx", EX / "pruned40_maD20_lw.o", "tanh"),
+    "R_50":      (HOME / "workspace_docs/model/u8/pruned50_u8_maD20.onnx", EX / "pruned50_maD20_lw.o", "tanh"),
+}
+
+
+def sess(p):
+    so = ort.SessionOptions(); so.log_severity_level = 3
+    return ort.InferenceSession(str(p), so, providers=["CPUExecutionProvider"])
+
+
+def build_front(model_path: Path):
+    m = onnx.load(str(model_path))
+    in_name = m.graph.input[0].name
+    q_out = m.graph.node[0].output[0]                    # 첫 노드 = QuantizeLinear
+    f = Path(f"/tmp/{model_path.stem}.front.onnx")
+    # 디스크가 가득 찼을 때 0 바이트 캐시가 남아 이후 실행이 전부 실패한 적이 있습니다.
+    # 존재 여부만 보지 말고 내용까지 확인합니다.
+    if f.exists() and f.stat().st_size == 0:
+        f.unlink()
+    if not f.exists():
+        onnx.utils.extract_model(str(model_path), str(f), [in_name], [q_out])
+    return sess(f), in_name
+
+
+def dequant_params(model_path: Path):
+    """해상도(19/38/76) → (scale, zero_point)."""
+    m = onnx.load(str(model_path))
+    init = {i.name: i for i in m.graph.initializer}
+    out_shape = {v.name: [d.dim_value for d in v.type.tensor_type.shape.dim]
+                 for v in m.graph.output}
+    dq = {}
+    for n in m.graph.node:
+        if n.op_type != "DequantizeLinear":
+            continue
+        res = None
+        if n.output[0] in out_shape:                      # 프루닝 모델: 헤드가 그래프 출력
+            res = out_shape[n.output[0]][-1]
+        else:                                             # 후처리 내장: 이름으로 매칭
+            for r, nm in DQ_BY_NAME.get(str(model_path), {}).items():
+                if n.name == nm:
+                    res = r
+        if res in (19, 38, 76):
+            dq[res] = (float(numpy_helper.to_array(init[n.input[1]])),
+                       int(numpy_helper.to_array(init[n.input[2]])))
+    return dq
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("target", choices=sorted(TARGETS))
+    ap.add_argument("--limit", type=int, default=0, help="0 = 전체 5000장")
+    ap.add_argument("--seed", type=int, default=0)
+    args = ap.parse_args()
+
+    onnx_path, bin_path, dec = TARGETS[args.target]
+    if not bin_path.exists():
+        print(f"{args.target}: 바이너리 없음 {bin_path}"); sys.exit(1)
+
+    with contextlib.redirect_stdout(_io.StringIO()):
+        coco = COCO(str(COCO_ANN))
+    cat_ids = sorted(coco.getCatIds()); all_ids = sorted(coco.getImgIds())
+    rng = np.random.default_rng(args.seed)
+    img_ids = (sorted(rng.choice(all_ids, args.limit, replace=False).tolist())
+               if args.limit and args.limit < len(all_ids) else all_ids)
+
+    front, in_name = build_front(onnx_path)
+    dq = dequant_params(onnx_path)
+    if sorted(dq) != [19, 38, 76]:
+        print(f"역양자화 파라미터 부족: {sorted(dq)}"); sys.exit(1)
+    # 후처리가 별도 ONNX 로 분리된 배포본만 .back 을 씁니다. 재양자화본(R_*)은
+    # 헤드가 그대로 그래프 출력이라 numpy 로 디코딩합니다.
+    # NPU_NUMPY_DECODE=1 이면 .back 이 있어도 numpy 경로를 강제합니다(두 경로 대조용).
+    backp = str(onnx_path) + ".back"
+    use_back = (dec == "exp" and Path(backp).exists()
+                and not os.environ.get("NPU_NUMPY_DECODE"))
+    back = sess(backp) if use_back else None
+    bin_ = BACK_IN[backp] if use_back else None
+    if dec == "exp" and not use_back:
+        why = "강제 지정" if os.environ.get("NPU_NUMPY_DECODE") else ".back 없음"
+        print(f"   (numpy exp 디코더 사용 — {why})", flush=True)
+
+    d = NeublaDriver()
+    assert d.Init() == 0, "Init 실패"
+    if d.LoadModel(str(bin_path)) != 0:
+        print("LoadModel 실패 — 재시도하거나 hostreset 필요"); sys.exit(1)
+    print(f"▶ {args.target}  ({bin_path.name}, 디코더 {dec}, 이미지 {len(img_ids)}장)", flush=True)
+
+    results, t_npu, t0 = [], 0.0, time.perf_counter()
+    try:
+        for i, iid in enumerate(img_ids, 1):
+            f = coco.loadImgs(iid)[0]
+            bgr = cv2.imread(str(COCO_IMG / f["file_name"]))
+            if bgr is None:
+                continue
+            h, w = bgr.shape[:2]
+            x = (cv2.resize(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB), (SIZE, SIZE))
+                 .astype(np.float32) / 255.0).transpose(2, 0, 1)[None]
+            q = front.run(None, {in_name: x})[0].tobytes()
+
+            t = time.perf_counter()
+            assert d.SendInput(q, 3 * SIZE * SIZE) == 0
+            assert d.Launch() == 0
+            assert d.Wait() == 0
+            raw = d.ReceiveOutputs()
+            t_npu += time.perf_counter() - t
+
+            heads = {}
+            for res, buf in zip((19, 38, 76), raw):
+                sc, zp = dq[res]
+                n = 255 * res * res
+                heads[res] = ((np.frombuffer(buf, np.uint8)[:n].astype(np.float32) - zp) * sc
+                              ).reshape(1, 255, res, res)
+
+            if use_back:
+                dd, ll = back.run(None, {bin_[19]: heads[19], bin_[38]: heads[38],
+                                         bin_[76]: heads[76]})
+                det = np.concatenate([dd[0][:, :5], ll[0][:, None].astype(np.float32)], 1)
+            else:
+                decode = decode_std if dec == "exp" else decode_nota
+                det = nms_per_class(decode([heads[76], heads[38], heads[19]],
+                                           score_thresh=0.001))
+
+            sx, sy = w / SIZE, h / SIZE
+            for x1, y1, x2, y2, s, c in det:
+                if s > 0.001:
+                    results.append({"image_id": iid, "category_id": cat_ids[int(c)],
+                                    "bbox": [float(x1*sx), float(y1*sy),
+                                             float((x2-x1)*sx), float((y2-y1)*sy)],
+                                    "score": float(s)})
+            if i % 500 == 0:
+                el = time.perf_counter() - t0
+                print(f"   {i}/{len(img_ids)}  NPU {t_npu/i*1000:.1f} ms/장  "
+                      f"전체 {el/i*1000:.0f} ms/장  남은 {(len(img_ids)-i)*el/i/60:.0f}분", flush=True)
+    finally:
+        d.Close()
+
+    with contextlib.redirect_stdout(_io.StringIO()):
+        e = COCOeval(coco, coco.loadRes(results), "bbox")
+        e.params.imgIds = img_ids; e.evaluate(); e.accumulate(); e.summarize()
+    s = e.stats * 100
+    print(f"  → AP {s[0]:.2f}  AP50 {s[1]:.2f}  AP75 {s[2]:.2f}  "
+          f"APs {s[3]:.2f}  APm {s[4]:.2f}  APl {s[5]:.2f}   "
+          f"(NPU {t_npu/len(img_ids)*1000:.1f} ms/장)", flush=True)
+    print(f"RESULT\t{args.target}\t{s[0]:.2f}\t{s[1]:.2f}\t{s[2]:.2f}\t{s[3]:.2f}\t{s[4]:.2f}\t{s[5]:.2f}\t{t_npu/len(img_ids)*1000:.1f}")
+
+    Path(f"map_npu_{args.target}.json").write_text(json.dumps(
+        {"target": args.target, "n_images": len(img_ids),
+         "AP": s[0], "AP50": s[1], "AP75": s[2], "APs": s[3], "APm": s[4], "APl": s[5],
+         "npu_ms": t_npu / len(img_ids) * 1000}, indent=2))
+
+
+if __name__ == "__main__":
+    main()

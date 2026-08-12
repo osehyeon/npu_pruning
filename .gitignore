@@ -1,0 +1,23 @@
+# 대용량 산출물 — 별도 배포
+*.onnx
+*.weights
+*.o
+*.pt
+*.zip
+
+# 외부 자료 — 저장소에 포함하지 않음
+YOLOv3_Antara_재현패키지/
+onnxruntime-neubla/
+paper/*.pdf
+
+# 환경
+example/.venv38/
+__pycache__/
+*.pyc
+
+# 로컬 캐시·중간 산출물
+*.shapes
+*.cache
+*.npy
+*.log
+*.jpg
