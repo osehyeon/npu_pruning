@@ -21,3 +21,18 @@ __pycache__/
 *.npy
 *.log
 *.jpg
+
+# 컴파일러 스케줄 기록 · 2,624 개 · 1.7 GB
+example/nbc_artifacts/
+
+# 데이터셋 · COCO val2017 788 MB
+datasets/
+# 벤더 배포본 사본
+example/demo/
+# 컴파일 · 측정 셸 로그
+example/logs/
+
+# 밀려난 IEEE Access 원고의 재료. 사본이 fgcs/archive/neubla/superseded-2026-09-16/ 에 있다
+paper/draft/
+paper/figures/
+paper/template/
