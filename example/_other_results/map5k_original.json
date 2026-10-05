@@ -1,0 +1,20 @@
+{
+  "tag": "5k",
+  "ann": "/home/osehn/datasets/coco2014/annotations/instances_val2014.json",
+  "n_images": 5000,
+  "size": 608,
+  "preproc": "resize",
+  "results": [
+    {
+      "name": "original",
+      "AP": 31.50939126406309,
+      "AP50": 56.177945858151865,
+      "AP75": 31.933406232045503,
+      "APs": 19.402384282574744,
+      "APm": 34.29524520612593,
+      "APl": 40.372280108806805,
+      "ndet": 239282,
+      "ms": 241.02786504356192
+    }
+  ]
+}

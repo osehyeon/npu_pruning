@@ -1,0 +1,12 @@
+model	combo	total_ms	std	launch_wait_ms
+sw10sc8	lw	56.63	1.07	56.13
+sw10sc8	egshalf	28.67	0.42	28.17
+sw10sc16	lwhalf	48.41	0.98	47.91
+sw10sc16	egs	33.58	0.83	33.08
+sw10sc64	lwhalf	49.53	0.71	49.03
+sw10sc64	egshalf	27.58	1.04	27.08
+sw30sc8	egs	29.26	0.92	28.76
+sw30sc64	egshalf	23.09	1.01	22.59
+sw50sc64	lwhalf	40.11	0.81	39.61
+sw50sc8	lw	47.74	1.03	47.24
+sw50sc64	lw	43.61	0.72	43.11
