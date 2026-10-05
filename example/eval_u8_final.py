@@ -56,8 +56,8 @@ TARGETS = {
     "neubla_q": (YV / "yolov3-mod-precomile-quantize.onnx", "builtin", None),
     # fp32 원본 — uint8 과 완전히 같은 경로로 재기 위한 타깃
     "fp32_orig": (HOME / "workspace_docs/model/yolov3_original_fp32.onnx", "exp", BACK),
-    "fp32_p40":  (HOME / "workspace_docs/model/yolov3_pruned40_fp32.onnx", "tanh", None),
-    "fp32_p50":  (HOME / "workspace_docs/model/yolov3_pruned50_fp32.onnx", "tanh", None),
+    "fp32_p40":  (HOME / "workspace_docs/paper/model/final/final_r40_sc64.onnx", "tanh", None),
+    "fp32_p50":  (HOME / "workspace_docs/paper/model/final/final_r50_sc64.onnx", "tanh", None),
 }
 FP32_REF = {"original": 38.26, "pruned40": 30.19, "pruned50": 26.13, "neubla_q": 38.26,
             "fp32_orig": 38.26, "fp32_p40": 30.19, "fp32_p50": 26.13}

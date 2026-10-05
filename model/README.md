@@ -4,6 +4,10 @@
 
 Nota AI 가 압축한 YOLOv3 를 압축률별로 모아둔 것입니다. **전부 양자화 전 float32** 입니다.
 
+> 2026-09-16 · 프루닝 모델 둘은 `paper/model/final/` 의 파일과 바이트까지 같아 이 폴더의 사본을 지웠습니다.
+> 이 폴더에 실물로 남은 fp32 는 BN 을 접은 `yolov3_original_fp32.onnx` 하나이고, 접지 않은 Model Zoo 원본은
+> `paper/model/parent/yolov3-12_bn-unfolded.onnx` 입니다. 스크립트는 전부 새 경로로 고쳤습니다.
+
 ---
 
 ## 내용
@@ -11,8 +15,8 @@ Nota AI 가 압축한 YOLOv3 를 압축률별로 모아둔 것입니다. **전�
 | 파일 | 크기 | Conv | 총 채널 | 원본 대비 | md5 (앞 12자리) |
 |---|---:|---:|---:|---:|---|
 | `yolov3_original_fp32.onnx` | 247.7 MB | 75 | 27,069 | 100.0 % | `c4964902f76f` |
-| `yolov3_pruned40_fp32.onnx` | 81.5 MB | 75 | 17,021 | **62.9 %** | `d26ca1453abc` |
-| `yolov3_pruned50_fp32.onnx` | 59.0 MB | 75 | 14,781 | **54.6 %** | `1e5ca97e3a32` |
+| `../paper/model/final/final_r40_sc64.onnx` | 81.5 MB | 75 | 17,021 | **62.9 %** | `d26ca1453abc` |
+| `../paper/model/final/final_r50_sc64.onnx` | 59.0 MB | 75 | 14,781 | **54.6 %** | `1e5ca97e3a32` |
 
 셋 다 **동일한 형태**입니다 — opset 12 · IR 7 · 노드 174개 · Conv 75개 ·
 입력 `[1, 3, 608, 608]` · 출력 `356` `342` `309` (YOLO 헤드 3개).
@@ -27,8 +31,10 @@ Nota AI 가 압축한 YOLOv3 를 압축률별로 모아둔 것입니다. **전�
 
 ```
 yolov3_original_fp32.onnx  ←  demo_pruning/model_float32/yolov3.onnx
-yolov3_pruned40_fp32.onnx  ←  demo_pruning/model_float32/compressed_yolov3_40%.onnx
-yolov3_pruned50_fp32.onnx  ←  demo_0211/nota_model_0523/compressed_yolov3_50%.onnx
+                               (= ONNX Model Zoo yolov3-12.onnx 의 BN 접기 판본.
+                                원본 다운로드: https://github.com/onnx/models/blob/main/validated/vision/object_detection_segmentation/yolov3/README.md)
+paper/model/final/final_r40_sc64.onnx  ←  demo_pruning/model_float32/compressed_yolov3_40%.onnx
+paper/model/final/final_r50_sc64.onnx  ←  demo_0211/nota_model_0523/compressed_yolov3_50%.onnx
 ```
 
 ### 왜 이 파일들을 골랐나

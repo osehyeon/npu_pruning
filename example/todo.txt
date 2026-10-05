@@ -1,0 +1,11 @@
+original egs
+sw50sc32 egshalf
+sw30sc8 egshalf
+sw30sc16 egshalf
+sw30sc32 egshalf
+sw10sc8 lwhalf
+sw10sc8 egshalf
+sw10sc16 lwhalf
+sw10sc16 egshalf
+sw10sc32 egshalf
+sw10sc64 egshalf

@@ -38,8 +38,8 @@ minicom -D /dev/ttyUSB0
 ```
 
 ```
-set_dbgprint                 # 인자 없으면 현재 상태만 출력
-set_dbgprint uart off        # 끄기
+dbgprint                 # 인자 없으면 현재 상태만 출력
+dbgprint uart off        # 끄기
 ```
 
 종료는 `Ctrl-A` → `X`.
@@ -51,7 +51,7 @@ set_dbgprint uart off        # 끄기
 | | 위치 | 영향 | 확인 |
 |---|---|---|---|
 | `o_dbg` | 호스트 PLDA 드라이버 | 커널 로그로 **디스크**를 채움 | `cat /sys/module/plda/parameters/o_dbg` |
-| `dbgprint` | **보드 펌웨어** | UART 출력으로 **지연** 증가 | `minicom` → `set_dbgprint` |
+| `dbgprint` | **보드 펌웨어** | UART 출력으로 **지연** 증가 | `minicom` → `dbgprint` |
 
 둘 다 꺼야 합니다. `load_driver.sh` 는 `o_dbg=0` 이 기본이지만 `dbgprint` 는 손대지 않습니다.
 
@@ -86,7 +86,7 @@ PCIe hot reset 은 엔드포인트 레지스터만 리셋하고 **Antara SoC 는
 재부팅 후:
 
 ```bash
-minicom -D /dev/ttyUSB0     # set_dbgprint uart off  ← 잊지 말 것
+minicom -D /dev/ttyUSB0     # dbgprint uart off  ← 잊지 말 것
 ~/workdir/load_driver.sh
 ```
 
@@ -139,7 +139,7 @@ egs   22.3 ms    92 MB      1.88×  (연산 구간만 1.98×)
 ## 측정 체크리스트
 
 ```
-□ minicom → set_dbgprint uart off          ← 재부팅 때마다
+□ minicom → dbgprint uart off          ← 재부팅 때마다
 □ ~/workdir/load_driver.sh  (o_dbg=0 확인)
 □ LoadModel 실패 시 → 컴퓨터 재부팅 (hostreset 아님)
 □ 모델마다 프로세스를 새로 띄울 것          ← run_bench.sh 가 처리

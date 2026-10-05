@@ -36,8 +36,8 @@ SIZE = 608
 DRIVE = HOME / "workspace_docs/YOLOv3_Antara_재현패키지/전처리/구글드라이브"
 MODELS = [
     ("original", MODEL_DIR / "yolov3_original_fp32.onnx", "input.1"),
-    ("pruned40", MODEL_DIR / "yolov3_pruned40_fp32.onnx", "input_1"),
-    ("pruned50", MODEL_DIR / "yolov3_pruned50_fp32.onnx", "input_1"),
+    ("pruned40", MODEL_DIR / "../paper/model/final/final_r40_sc64.onnx", "input_1"),
+    ("pruned50", MODEL_DIR / "../paper/model/final/final_r50_sc64.onnx", "input_1"),
 ]
 # staircase 스윕 (50% × sc 8/16/32/64) — 하드웨어 정렬 실험용
 SWEEP50 = [(f"sw50sc{sc}", DRIVE / f"sweep_12종/50/compressed_{sc}_yolov3-12_sim.onnx", None)
@@ -45,7 +45,8 @@ SWEEP50 = [(f"sw50sc{sc}", DRIVE / f"sweep_12종/50/compressed_{sc}_yolov3-12_si
 SWEEP_ALL = [(f"sw{r}sc{sc}", DRIVE / f"sweep_12종/{r}/compressed_{sc}_yolov3-12_sim.onnx", None)
              for r in (10, 30, 50) for sc in (8, 16, 32, 64)]
 # 우리 재학습본 (프루닝 40% + trainvalno5k 10 에포크)
-OURS = [("p40ep10", MODEL_DIR / "p40_ep10_clean.onnx", "images")]
+# 2026-09-16 · 논문에 쓰지 않아 fgcs/archive/neubla/models-not-in-paper/model/ 로 옮겼다
+OURS = [("p40ep10", MODEL_DIR.parent.parent.parent / "archive/neubla/models-not-in-paper/model/p40_ep10_clean.onnx", "images")]
 
 
 def pick_calib_images(n: int, seed: int = 1234, d: Path | None = None) -> list[str]:

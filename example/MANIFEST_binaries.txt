@@ -1,0 +1,76 @@
+# 2026-09-16 이전의 목록. 그 뒤 p40ep10 계열 .o 넷과 fp32 넷, u8 하나는 fgcs/archive/neubla/models-not-in-paper/ 로 옮겼고
+# model/yolov3_pruned40_fp32.onnx 와 yolov3_pruned50_fp32.onnx 는 paper/model/final/final_r40_sc64.onnx, final_r50_sc64.onnx 와
+# 같은 파일이라 지웠다. 지금 남은 .o 는 58 종, model/ 의 fp32 는 yolov3_original_fp32.onnx 하나다.
+
+=== 컴파일 산출물 .o (62) ===
+100M	example/40_egs.o
+113M	example/40_lwhalf.o
+92M	example/50_egs.o
+144M	example/orig_egs.o
+145M	example/original_egshalf.o
+144M	example/original_egs.o
+160M	example/original_lwhalf.o
+160M	example/original_maD20_lw.o
+98M	example/p40ep10_egshalf.o
+100M	example/p40ep10_egs.o
+113M	example/p40ep10_lwhalf.o
+113M	example/p40ep10_lw.o
+113M	example/pruned40_maD20_lw.o
+105M	example/pruned50_maD20_lw.o
+136M	example/sw10sc16_egshalf.o
+135M	example/sw10sc16_egs.o
+152M	example/sw10sc16_lwhalf.o
+152M	example/sw10sc16_lw.o
+135M	example/sw10sc32_egshalf.o
+135M	example/sw10sc32_egs.o
+150M	example/sw10sc32_lwhalf.o
+150M	example/sw10sc32_lw.o
+135M	example/sw10sc64_egshalf.o
+135M	example/sw10sc64_egs.o
+149M	example/sw10sc64_lwhalf.o
+149M	example/sw10sc64_lw.o
+136M	example/sw10sc8_egshalf.o
+135M	example/sw10sc8_egs.o
+152M	example/sw10sc8_lwhalf.o
+152M	example/sw10sc8_lw.o
+115M	example/sw30sc16_egshalf.o
+117M	example/sw30sc16_egs.o
+133M	example/sw30sc16_lwhalf.o
+133M	example/sw30sc16_lw.o
+107M	example/sw30sc32_egshalf.o
+109M	example/sw30sc32_egs.o
+125M	example/sw30sc32_lwhalf.o
+125M	example/sw30sc32_lw.o
+107M	example/sw30sc64_egshalf.o
+109M	example/sw30sc64_egs.o
+124M	example/sw30sc64_lwhalf.o
+124M	example/sw30sc64_lw.o
+115M	example/sw30sc8_egshalf.o
+116M	example/sw30sc8_egs.o
+133M	example/sw30sc8_lwhalf.o
+133M	example/sw30sc8_lw.o
+94M	example/sw50sc16_egshalf.o
+94M	example/sw50sc16_egs.o
+111M	example/sw50sc16_lwhalf.o
+111M	example/sw50sc16_lw.o
+93M	example/sw50sc32_egshalf.o
+92M	example/sw50sc32_egs.o
+109M	example/sw50sc32_lwhalf.o
+109M	example/sw50sc32_lw.o
+92M	example/sw50sc64_egshalf.o
+92M	example/sw50sc64_egs.o
+105M	example/sw50sc64_lwhalf.o
+105M	example/sw50sc64_lw.o
+95M	example/sw50sc8_egshalf.o
+95M	example/sw50sc8_egs.o
+113M	example/sw50sc8_lwhalf.o
+112M	example/sw50sc8_lw.o
+
+=== fp32 모델 (7) ===
+78M	model/p40_ep10_clean.onnx
+78M	model/p40_ep10_fp32.onnx
+237M	model/yolov3_original_fp32.onnx
+78M	model/yolov3_p40_ep10_fp32.onnx
+20M	model/yolov3_p40_ep10_fp32_u8ma20.onnx
+78M	model/yolov3_pruned40_fp32.onnx
+57M	model/yolov3_pruned50_fp32.onnx

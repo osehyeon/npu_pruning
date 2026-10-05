@@ -1,0 +1,13 @@
+[Unit]
+Description=Antara NPU board init (UART dbgprint off + PLDA driver)
+After=multi-user.target
+Wants=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/osehn/workspace_docs/boot/npu-board-init.sh
+RemainAfterExit=yes
+TimeoutStartSec=180
+
+[Install]
+WantedBy=multi-user.target

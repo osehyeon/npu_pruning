@@ -93,7 +93,9 @@ cwd 를 `workspace_docs` 로 두면 아래는 밖입니다. 필요하면 `/add-d
 
 ## 미완
 
-- `yolov3_original_fp32.onnx` 의 공개 출처 미확인 (Nota 자체 학습 추정).
+- ~~`yolov3_original_fp32.onnx` 의 공개 출처 미확인~~ → **2026-08-26 확정.**
+  ONNX Model Zoo `yolov3-12` 의 BatchNorm 접기 판본이며 Conv 75 개 전부 비트 동일.
+  따라서 계보는 Darknet 이고 held-out 은 `5k` 입니다.
 - 배포 원본 uint8 의 fp32 소스 — 워크스페이스 밖. mmdet 계열이라 프루닝 실험과는 무관.
 
 (R 계열 NPU 재측정은 2026-08-09 완료 — `docs/pruning-map-comparison.md` 의 R 계열 절)

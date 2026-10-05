@@ -1,17 +1,17 @@
 # 논문용 모델 세트
 
-프루닝율 × staircase 격자와 그 파생 모델 19종. 모든 항목의 해시·구조·연산량·NPU 실측은
+프루닝율 × staircase 격자와 그 파생 모델 18종. 모든 항목의 해시·구조·연산량·NPU 실측은
 `manifest.json` 에 고정돼 있습니다.
 
 ## 구성
 
 | 그룹 | 개수 | 내용 |
 |---|---:|---|
-| `parent/` | 1 | ONNX Model Zoo `yolov3-12` — 프루닝 부모. pjreddie 가중치와 Conv 75개 비트 동일 |
+| `parent/` | 1 | 프루닝 부모. ONNX Model Zoo 의 `yolov3-12.onnx` 를 <https://github.com/onnx/models/blob/main/validated/vision/object_detection_segmentation/yolov3/README.md> 에서 받은 그대로. pjreddie 가중치와 Conv 75개 비트 동일. 파일명 `yolov3-12_bn-unfolded.onnx` 로 BN 을 접지 않았음을 표시. 접은 판본은 `../../model/yolov3_original_fp32.onnx` |
 | `sweep/` | 12 | 2025-03 스윕 — 10/30/50 % × sc 8/16/32/64. **재학습 전** |
 | `comp250514/` | 3 | 2025-05-14 — 30/40/45 % × sc64. **재학습 전** |
 | `final/` | 2 | Nota 제출본 40 % / 50 %. **재학습 후** |
-| `ours/` | 1 | 본 연구 재현 — 마스크 복원 프루닝 + `trainvalno5k` 10 epoch 재학습 |
+| `ours/` | 0 | 본 연구 재현본 1 종이 있었음. 논문에 쓰지 않아 2026-09-16 에 `fgcs/archive/neubla/models-not-in-paper/paper-model-ours/` 로 옮김. `manifest.json` 의 항목은 기록으로 남김 |
 
 ## 매니페스트 필드
 
@@ -35,13 +35,14 @@ npu_latency_s                                   2025-03 Antara 실측 (연계 �
 
 | ratio | sc | raw MACs | padded MACs | 64배수 conv | 패딩 낭비 | NPU (s) |
 |---:|---:|---:|---:|---:|---:|---:|
-| 50 | 8 | **38.2 G** | 61.9 G | 18/75 | 62.1 % | 0.0462 |
-| 50 | 16 | 38.1 G | 60.2 G | 32/75 | 57.7 % | 0.0463 |
-| 50 | 32 | 39.0 G | 59.2 G | 52/75 | 52.0 % | 0.0463 |
-| **50** | **64** | **42.0 G** | **58.9 G** | **70/75** | **40.2 %** | **0.0413** |
+| 50 | 8 | **38.0 G** | 61.7 G | 18/75 | 62.4 % | 0.0462 |
+| 50 | 16 | 37.9 G | 59.9 G | 32/75 | 58.0 % | 0.0463 |
+| 50 | 32 | 38.7 G | 58.9 G | 52/75 | 52.3 % | 0.0463 |
+| **50** | **64** | **41.8 G** | **58.7 G** | **70/75** | **40.5 %** | **0.0413** |
 
 sc64 는 raw MACs 가 **가장 많은데** NPU 에서 **가장 빠릅니다**. 상관계수도 padded 쪽이
-높습니다 (raw r = +0.881, padded r = +0.921). 연산량 지표만 보면 정반대 결론이 나옵니다.
+높습니다 (npu_latency_s 를 가진 15종 기준 raw r = +0.891, padded r = +0.946.
+sweep 12종만 보면 +0.878 과 +0.932). 연산량 지표만 보면 정반대 결론이 나옵니다.
 
 ## 명목 대 실효
 
@@ -61,7 +62,7 @@ sc64 는 raw MACs 가 **가장 많은데** NPU 에서 **가장 빠릅니다**. �
 - `final/` 은 Nota 가 **COCO train2017** 로 재학습했습니다. `5k` 평가셋의 87 %가
   그 학습 데이터에 포함되므로 **5k 로 평가하면 안 됩니다** →
   `docs/coco-split-contamination.md`
-- `ours/` 는 `trainvalno5k` 로 재학습했으므로 `5k` 가 held-out 입니다.
+- archive 로 옮긴 `ours` 는 `trainvalno5k` 로 재학습했으므로 `5k` 가 held-out 입니다.
 - `npu_latency_s` 는 2025-03 측정으로, 당시 컴파일 옵션·드라이버 기준입니다.
   현재 조건과 다를 수 있습니다.
 

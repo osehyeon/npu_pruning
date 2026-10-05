@@ -34,8 +34,9 @@ from pycocotools.cocoeval import COCOeval
 from NeublaDriver import NeublaDriver
 
 HOME = Path.home()
-COCO_IMG = HOME / "datasets/coco/images/val2017"
-COCO_ANN = HOME / "datasets/coco/annotations/instances_val2017.json"
+COCO_IMG = Path(os.environ.get("COCO_IMG", HOME / "datasets/coco/images/val2017"))
+COCO_ANN = Path(os.environ.get("COCO_ANN", HOME / "datasets/coco/annotations/instances_val2017.json"))
+COCO_IDS = os.environ.get("COCO_IDS")        # 한 줄에 image_id 하나. 지정하면 이 목록만 평가
 EX = HOME / "workspace_docs/example"
 SIZE = 608
 
@@ -79,6 +80,18 @@ TARGETS = {
     "R_orig":    (HOME / "workspace_docs/model/u8/original_u8_maD20.onnx", EX / "original_maD20_lw.o", "exp"),
     "R_40":      (HOME / "workspace_docs/model/u8/pruned40_u8_maD20.onnx", EX / "pruned40_maD20_lw.o", "tanh"),
     "R_50":      (HOME / "workspace_docs/model/u8/pruned50_u8_maD20.onnx", EX / "pruned50_maD20_lw.o", "tanh"),
+    # 스윕 12종 — lw 대 egs 대조용. egs 는 벤더 검증이 pybind 오류로 중단되어
+    # 수치 검증 없이 회수한 바이너리이므로 여기서 mAP 로 정합을 확인한다.
+    "sw30sc32_lw":  (HOME / "workspace_docs/model/u8/sw30sc32_u8_maD20.onnx", EX / "sw30sc32_lw.o",  "tanh"),
+    "sw30sc32_egs": (HOME / "workspace_docs/model/u8/sw30sc32_u8_maD20.onnx", EX / "sw30sc32_egs.o", "tanh"),
+    "sw50sc32_lw":  (HOME / "workspace_docs/model/u8/sw50sc32_u8_maD20.onnx", EX / "sw50sc32_lw.o",  "tanh"),
+    "sw50sc32_egs": (HOME / "workspace_docs/model/u8/sw50sc32_u8_maD20.onnx", EX / "sw50sc32_egs.o", "tanh"),
+    "sw50sc64_lw":  (HOME / "workspace_docs/model/u8/sw50sc64_u8_maD20.onnx", EX / "sw50sc64_lw.o",  "tanh"),
+    "p40_lw":      (HOME / "workspace_docs/model/u8/p40ep10_u8_maD20.onnx", EX / "p40ep10_lw.o", "exp"),
+    "p40_lwhalf":  (HOME / "workspace_docs/model/u8/p40ep10_u8_maD20.onnx", EX / "p40ep10_lwhalf.o", "exp"),
+    "p40_egs":     (HOME / "workspace_docs/model/u8/p40ep10_u8_maD20.onnx", EX / "p40ep10_egs.o", "exp"),
+    "p40_egshalf": (HOME / "workspace_docs/model/u8/p40ep10_u8_maD20.onnx", EX / "p40ep10_egshalf.o", "exp"),
+    "sw50sc64_egs": (HOME / "workspace_docs/model/u8/sw50sc64_u8_maD20.onnx", EX / "sw50sc64_egs.o", "tanh"),
 }
 
 
@@ -137,7 +150,13 @@ def main() -> None:
 
     with contextlib.redirect_stdout(_io.StringIO()):
         coco = COCO(str(COCO_ANN))
-    cat_ids = sorted(coco.getCatIds()); all_ids = sorted(coco.getImgIds())
+    cat_ids = sorted(coco.getCatIds())
+    if COCO_IDS:
+        want = {int(x) for x in Path(COCO_IDS).read_text().split()}
+        all_ids = sorted(set(coco.getImgIds()) & want)
+        print(f"평가 집합 {Path(COCO_IDS).name}: {len(all_ids)} 장", flush=True)
+    else:
+        all_ids = sorted(coco.getImgIds())
     rng = np.random.default_rng(args.seed)
     img_ids = (sorted(rng.choice(all_ids, args.limit, replace=False).tolist())
                if args.limit and args.limit < len(all_ids) else all_ids)
@@ -165,6 +184,7 @@ def main() -> None:
     print(f"▶ {args.target}  ({bin_path.name}, 디코더 {dec}, 이미지 {len(img_ids)}장)", flush=True)
 
     results, t_npu, t0 = [], 0.0, time.perf_counter()
+    n_retry = 0
     try:
         for i, iid in enumerate(img_ids, 1):
             f = coco.loadImgs(iid)[0]
@@ -176,12 +196,20 @@ def main() -> None:
                  .astype(np.float32) / 255.0).transpose(2, 0, 1)[None]
             q = front.run(None, {in_name: x})[0].tobytes()
 
-            t = time.perf_counter()
-            assert d.SendInput(q, 3 * SIZE * SIZE) == 0
-            assert d.Launch() == 0
-            assert d.Wait() == 0
-            raw = d.ReceiveOutputs()
-            t_npu += time.perf_counter() - t
+            # 일부 바이너리는 격 회차마다 완료 통보를 놓쳐 3초 타임아웃 뒤
+            # 직전 회차의 출력을 그대로 돌려준다. 소요 시간으로 판별해 다시 실행한다.
+            SLOW_MS = 500.0
+            for _att in range(6):
+                t = time.perf_counter()
+                assert d.SendInput(q, 3 * SIZE * SIZE) == 0
+                assert d.Launch() == 0
+                assert d.Wait() == 0
+                raw = d.ReceiveOutputs()
+                dt = time.perf_counter() - t
+                if dt * 1000 < SLOW_MS:
+                    break
+                n_retry += 1
+            t_npu += dt
 
             heads = {}
             for res, buf in zip((19, 38, 76), raw):
@@ -219,7 +247,7 @@ def main() -> None:
     s = e.stats * 100
     print(f"  → AP {s[0]:.2f}  AP50 {s[1]:.2f}  AP75 {s[2]:.2f}  "
           f"APs {s[3]:.2f}  APm {s[4]:.2f}  APl {s[5]:.2f}   "
-          f"(NPU {t_npu/len(img_ids)*1000:.1f} ms/장)", flush=True)
+          f"(NPU {t_npu/len(img_ids)*1000:.1f} ms/장, 재시도 {n_retry}회)", flush=True)
     print(f"RESULT\t{args.target}\t{s[0]:.2f}\t{s[1]:.2f}\t{s[2]:.2f}\t{s[3]:.2f}\t{s[4]:.2f}\t{s[5]:.2f}\t{t_npu/len(img_ids)*1000:.1f}")
 
     Path(f"map_npu_{args.target}.json").write_text(json.dumps(

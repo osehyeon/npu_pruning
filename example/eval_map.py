@@ -23,7 +23,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 import onnxruntime as ort
-from decoders import decode_nota, nms_per_class
+from decoders import decode_nota, decode_std, nms_per_class
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 
@@ -39,8 +39,10 @@ MODEL_DIR = HOME / "workspace_docs/model"
 #   tanh : Nota 프루닝    wh = 2*(tanh(t/2-0.549)+1)*anchor
 MODELS = [
     ("original", MODEL_DIR / "yolov3_original_fp32.onnx", "exp"),
-    ("pruned40", MODEL_DIR / "yolov3_pruned40_fp32.onnx", "tanh"),
-    ("pruned50", MODEL_DIR / "yolov3_pruned50_fp32.onnx", "tanh"),
+    ("pruned40", MODEL_DIR / "../paper/model/final/final_r40_sc64.onnx", "tanh"),
+    ("pruned50", MODEL_DIR / "../paper/model/final/final_r50_sc64.onnx", "tanh"),
+    # p40ep10 재현본은 논문에 쓰지 않아 fgcs/archive/neubla/models-not-in-paper/model/ 로 옮겼다 (2026-09-16)
+    # ("p40ep10",  MODEL_DIR / "yolov3_p40_ep10_fp32.onnx", "exp_np"),
 ]
 SIZE = 608
 
@@ -76,6 +78,9 @@ def evaluate(name: str, model_path: Path, decoder: str, coco: COCO, img_ids: lis
                                    "onnx::Transpose_688": by_res[38],
                                    "onnx::Transpose_692": by_res[76]})
             det = np.concatenate([d[0][:, :5], l[0][:, None].astype(np.float32)], 1)
+        elif decoder == "exp_np":
+            det = nms_per_class(decode_std([by_res[76], by_res[38], by_res[19]],
+                                           score_thresh=0.001))
         else:
             det = nms_per_class(decode_nota([by_res[76], by_res[38], by_res[19]],
                                             score_thresh=0.001))

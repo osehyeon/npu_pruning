@@ -46,25 +46,34 @@ ALIGN = 64
 def analyze(path, size=608):
     m = onnx.load(str(path))
     init = {i.name: numpy_helper.to_array(i) for i in m.graph.initializer}
-    hw = size
+    # 해상도는 텐서별로 전파한다. 노드를 선형으로 훑으며 hw 하나를 누적하면
+    # 헤드의 분기 구간에서 계층 해상도가 어긋나 MACs 가 최대 1 % 틀어진다.
+    dim = {m.graph.input[0].name: size}
     raw = pad = 0
     act_raw = act_pad = 0
     chans = []
     for n in m.graph.node:
-        if n.op_type == "Conv" and len(n.input) > 1 and n.input[1] in init:
-            w = init[n.input[1]]
+        src = next((dim[i] for i in n.input if i in dim), None)
+        if n.op_type == "Conv":
             st = next((a.ints[0] for a in n.attribute if a.name == "strides"), 1)
-            hw = hw // st
-            o, c, kh, kw = w.shape
-            op = math.ceil(o / ALIGN) * ALIGN
-            cp = math.ceil(c / ALIGN) * ALIGN
-            raw += o * c * kh * kw * hw * hw
-            pad += op * cp * kh * kw * hw * hw
-            act_raw += o * hw * hw
-            act_pad += op * hw * hw
-            chans.append(o)
+            hw = src // st
+            for t in n.output:
+                dim[t] = hw
+            if len(n.input) > 1 and n.input[1] in init:
+                o, c, kh, kw = init[n.input[1]].shape
+                op = math.ceil(o / ALIGN) * ALIGN
+                cp = math.ceil(c / ALIGN) * ALIGN
+                raw += o * c * kh * kw * hw * hw
+                pad += op * cp * kh * kw * hw * hw
+                act_raw += o * hw * hw
+                act_pad += op * hw * hw
+                chans.append(o)
         elif n.op_type in ("Resize", "Upsample"):
-            hw *= 2
+            for t in n.output:
+                dim[t] = src * 2
+        elif src is not None:
+            for t in n.output:
+                dim[t] = src
     del m, init
     n64 = sum(1 for c in chans if c % ALIGN == 0)
     return dict(raw=raw, pad=pad, act_raw=act_raw, act_pad=act_pad,

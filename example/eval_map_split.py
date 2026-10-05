@@ -32,8 +32,10 @@ from pycocotools.cocoeval import COCOeval
 MODEL_DIR = Path.home() / "workspace_docs/model"
 MODELS = [
     ("original", MODEL_DIR / "yolov3_original_fp32.onnx", "exp"),
-    ("pruned40", MODEL_DIR / "yolov3_pruned40_fp32.onnx", "nota"),
-    ("pruned50", MODEL_DIR / "yolov3_pruned50_fp32.onnx", "nota"),
+    ("pruned40", MODEL_DIR / "../paper/model/final/final_r40_sc64.onnx", "nota"),
+    ("pruned50", MODEL_DIR / "../paper/model/final/final_r50_sc64.onnx", "nota"),
+    # p40ep10 재현본은 논문에 쓰지 않아 fgcs/archive/neubla/models-not-in-paper/model/ 로 옮겼다 (2026-09-16)
+    # ("p40ep10",  MODEL_DIR / "yolov3_p40_ep10_fp32.onnx", "exp"),
 ]
 
 

@@ -28,8 +28,8 @@ for r in (10, 30, 50):
 for r in (30, 40, 45):
     TARGETS.append((f"250514 {r}%", r, 64,
                     DRIVE / f"250514_comp/{r}_compressed_64_yolov3-12_sim.onnx"))
-TARGETS += [("최종 40%", 40, 64, MODEL / "yolov3_pruned40_fp32.onnx"),
-            ("최종 50%", 50, 64, MODEL / "yolov3_pruned50_fp32.onnx")]
+TARGETS += [("최종 40%", 40, 64, MODEL / "../paper/model/final/final_r40_sc64.onnx"),
+            ("최종 50%", 50, 64, MODEL / "../paper/model/final/final_r50_sc64.onnx")]
 
 
 def stats(path, size=608):
@@ -37,23 +37,30 @@ def stats(path, size=608):
     init = {i.name: numpy_helper.to_array(i) for i in m.graph.initializer}
     params = sum(a.size for a in init.values())
 
-    # 공간 크기 추적: Conv stride 와 Resize(업샘플)만 반영
-    hw, macs, ch = size, 0, []
-    spatial = {}
+    # 공간 크기 추적: 텐서별로 전파한다. hw 하나를 선형으로 누적하면 헤드의
+    # 분기 구간에서 계층 해상도가 어긋나 MACs 가 최대 1 % 틀어진다.
+    macs, ch = 0, []
+    dim = {m.graph.input[0].name: size}
     for n in m.graph.node:
-        if n.op_type == "Conv" and len(n.input) > 1 and n.input[1] in init:
-            w = init[n.input[1]]
+        src = next((dim[i] for i in n.input if i in dim), None)
+        if n.op_type == "Conv":
             st = 1
             for a in n.attribute:
                 if a.name == "strides":
                     st = a.ints[0]
-            hw = hw // st
-            o, c, kh, kw = w.shape
-            macs += o * c * kh * kw * hw * hw
-            ch.append(o)
-            spatial[n.output[0]] = hw
+            hw = src // st
+            for t in n.output:
+                dim[t] = hw
+            if len(n.input) > 1 and n.input[1] in init:
+                o, c, kh, kw = init[n.input[1]].shape
+                macs += o * c * kh * kw * hw * hw
+                ch.append(o)
         elif n.op_type in ("Resize", "Upsample"):
-            hw *= 2
+            for t in n.output:
+                dim[t] = src * 2
+        elif src is not None:
+            for t in n.output:
+                dim[t] = src
     del m, init
     return params, macs, sum(ch), len(ch)
 

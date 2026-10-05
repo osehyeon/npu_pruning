@@ -19,6 +19,8 @@ WS = Path.home() / "workspace_docs"
 DRIVE = WS / "YOLOv3_Antara_재현패키지/전처리/구글드라이브"
 MODEL = WS / "model"
 OUT = WS / "paper/model"
+# 논문에 쓰지 않은 재현본은 2026-09-16 에 여기로 옮겼다. 없으면 건너뛴다
+ARCHIVE = WS.parent.parent / "archive/neubla/models-not-in-paper"
 ALIGN = 64
 
 # 연계 문서 E02 — 2025.03.25 NPU latency 스윕 (초)
@@ -27,8 +29,10 @@ NPU_LAT = {(0, None): 0.0571,
            (30, 8): 0.0524, (30, 16): 0.0505, (30, 32): 0.0466, (30, 64): 0.0474,
            (50, 8): 0.0462, (50, 16): 0.0463, (50, 32): 0.0463, (50, 64): 0.0413}
 
+FILENAME = {"original": "yolov3-12_bn-unfolded.onnx"}
+
 ITEMS = [("original", 0, None, "parent", DRIVE / "yolov3-12.onnx",
-          "ONNX Model Zoo yolov3-12 (프루닝 부모, BN 미폴드)")]
+          "ONNX Model Zoo yolov3-12 (프루닝 부모, BN 미폴드). 다운로드: https://github.com/onnx/models/blob/main/validated/vision/object_detection_segmentation/yolov3/README.md")]
 for r in (10, 30, 50):
     for sc in (8, 16, 32, 64):
         ITEMS.append((f"sweep_r{r}_sc{sc}", r, sc, "sweep",
@@ -38,13 +42,15 @@ for r in (30, 40, 45):
     ITEMS.append((f"comp250514_r{r}_sc64", r, 64, "comp250514",
                   DRIVE / f"250514_comp/{r}_compressed_64_yolov3-12_sim.onnx",
                   "2025-05-14 · 재학습 전"))
+# 2026-09-16 · model/ 의 사본을 지워 final/ 이 유일한 실물이다. 출처를 자기 자신으로 두면
+# 아래 복사 단계는 건너뛰고 통계와 지문만 다시 계산한다.
 ITEMS += [
-    ("final_r40_sc64", 40, 64, "final", MODEL / "yolov3_pruned40_fp32.onnx",
+    ("final_r40_sc64", 40, 64, "final", OUT / "final" / "final_r40_sc64.onnx",
      "Nota 제출본 · 재학습 후"),
-    ("final_r50_sc64", 50, 64, "final", MODEL / "yolov3_pruned50_fp32.onnx",
+    ("final_r50_sc64", 50, 64, "final", OUT / "final" / "final_r50_sc64.onnx",
      "Nota 50% · 재학습 후"),
-    ("ours_r40_sc64_ep10", 40, 64, "ours", MODEL / "yolov3_p40_ep10_fp32.onnx",
-     "본 연구 재현: 마스크 복원 프루닝 + trainvalno5k 10 epoch 재학습"),
+    ("ours_r40_sc64_ep10", 40, 64, "ours", ARCHIVE / "paper-model-ours" / "ours_r40_sc64_ep10.onnx",
+     "본 연구 재현: 마스크 복원 프루닝 + trainvalno5k 10 epoch 재학습 · 논문 미사용. archive 에 있음"),
 ]
 
 
@@ -89,7 +95,8 @@ def main():
         if not src.exists():
             print(f"  건너뜀 (없음): {name}"); continue
         d = OUT / group; d.mkdir(exist_ok=True)
-        dst = d / f"{name}.onnx"
+        # parent 는 BN 을 접지 않은 Model Zoo 원본임을 파일명에 남긴다. 접은 판본은 model/yolov3_original_fp32.onnx
+        dst = d / FILENAME.get(name, f"{name}.onnx")
         if not dst.exists():
             if args.link:
                 dst.symlink_to(src)

@@ -28,7 +28,7 @@ HOME = Path.home()
 SIZE = 608
 MODELS = {
     "원본":       HOME / "workspace_docs/model/yolov3_original_fp32.onnx",
-    "40% 프루닝": HOME / "workspace_docs/model/yolov3_pruned40_fp32.onnx",
+    "40% 프루닝": HOME / "workspace_docs/paper/model/final/final_r40_sc64.onnx",
 }
 
 

@@ -22,17 +22,42 @@
 서로의 상관계수는 **−0.05 ~ +0.14** 로 사실상 무관합니다.
 가중치뿐 아니라 **내보내기 도구·opset·입력 이름·출력 개수까지 전부 다릅니다.**
 
-### 정정 — 중간 계열은 ONNX Model Zoo 가 아닙니다
+### 출처 확정 — ONNX Model Zoo `yolov3-12` 입니다 (2026-08-26)
 
-한때 std 3.629 를 *"ONNX Model Zoo yolov3-12"* 로 적었는데 **틀렸습니다**:
+`yolov3_original_fp32.onnx` 는 Model Zoo `yolov3-12` 에서 **BatchNorm 을 Conv 에
+접어 넣은 것**입니다. Conv 75 개 전부 **최대 오차 0.000e+00**, 비트 단위 완전 일치입니다.
 
-- Model Zoo `yolov3-12` 는 **keras2onnx** 변환본이고 `image_shape` 보조 입력과
-  **NMS 내장** 그래프를 가집니다. 우리 파일은 **pytorch 내보내기 · raw 헤드 3개**입니다.
-- Model Zoo `yolov3-12` 의 공표 mAP 는 **28.74** 인데 우리 측정은 **38.26** 입니다.
+```
+zoo yolov3-12    Conv 75 · BN 별도 · 연산자 25종 · NMS 내장 · 247.9 MB
+이 파일          Conv 75 · BN 접힘 · 연산자  5종 · raw 헤드 3개 · 247.7 MB
+```
 
-이 파일의 **공표 출처는 확인되지 않았습니다.** 확실한 것은 *"프루닝 40 %/50 % 모델의
-실제 부모"* 라는 것뿐이며(미절단 레이어 상관 **1.0000**), 프루닝 손실 측정에는
-이것으로 충분합니다.
+접기 공식은 채널마다 `W' = W · gamma / sqrt(var + eps)` 입니다.
+
+**한때 "Model Zoo 가 아니다" 라고 정정했는데 그 정정이 틀렸습니다.** 근거 둘이 모두
+성립하지 않습니다.
+
+- 가중치를 **BN 을 접지 않고** 대조했습니다. 접지 않으면 채널 배율 때문에 상관이
+  0.60 으로 떨어집니다. 접으면 1.0000 입니다.
+- mAP 비교의 조건이 달랐습니다. 공표값 28.74 는 **416px · score 0.6** 이고
+  우리 38.26 은 **608px · score 0.001** 이며 게다가 **오염된 val2017** 값입니다.
+  깨끗한 5k 로 재면 31.51 로 문헌 대역입니다.
+
+그래프 구조가 다른 것은 맞지만 가중치는 같은 파일에서 왔습니다.
+
+**따라서 계보는 Darknet 입니다.** Model Zoo `yolov3-12` 가 pjreddie 가중치 변환본이므로
+학습 분할이 `trainvalno5k` 이고, held-out 이 `5k` 입니다. 이것이
+[coco-split-contamination.md](./coco-split-contamination.md) 의 관측과 정확히 맞습니다.
+
+재현:
+
+```bash
+python - <<'EOF'
+# zoo 의 Conv 뒤 BatchNormalization 을 찾아 W 에 접고 우리 파일과 대조
+EOF
+```
+
+`paper/evidence` 묶음의 `07-docs` 와 함께 보십시오.
 
 ---
 
