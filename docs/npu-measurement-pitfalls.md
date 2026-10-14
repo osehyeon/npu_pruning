@@ -96,6 +96,10 @@ minicom -D /dev/ttyUSB0     # dbgprint uart off  ← 잊지 말 것
 
 ## 3. 실측 — staircase 와 하드웨어 정렬
 
+> 2026-09-17 · 아래 padded MACs 열은 그때 쓰던 값입니다. `.o` 의 명령을 직접 해독해
+> 보니 산출물에 없는 모형값임이 드러나 논문에서 뺐습니다.
+> `~/Desktop/fgcs/archive/neubla/padded-macs-concept/README.md` 참조.
+
 `dbgprint` OFF · `maD20` 양자화 · `lw` 컴파일 · 50 % 프루닝 4종.
 
 | sc | raw MACs (G) | padded MACs (G) | 64배수 conv | 바이너리 | **NPU (ms)** |

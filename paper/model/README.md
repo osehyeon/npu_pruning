@@ -11,7 +11,7 @@
 | `sweep/` | 12 | 2025-03 스윕 — 10/30/50 % × sc 8/16/32/64. **재학습 전** |
 | `comp250514/` | 3 | 2025-05-14 — 30/40/45 % × sc64. **재학습 전** |
 | `final/` | 2 | Nota 제출본 40 % / 50 %. **재학습 후** |
-| `ours/` | 0 | 본 연구 재현본 1 종이 있었음. 논문에 쓰지 않아 2026-09-16 에 `fgcs/archive/neubla/models-not-in-paper/paper-model-ours/` 로 옮김. `manifest.json` 의 항목은 기록으로 남김 |
+| `ours/` | 0 | 본 연구 재현본 1 종이 있었음. 논문에 쓰지 않아 2026-09-16 에 `~/Desktop/fgcs/archive/neubla/models-not-in-paper/paper-model-ours/` 로 옮김. `manifest.json` 의 항목은 기록으로 남김 |
 
 ## 매니페스트 필드
 

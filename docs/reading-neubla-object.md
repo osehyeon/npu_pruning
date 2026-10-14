@@ -1,7 +1,7 @@
 # 컴파일된 `.o` 를 직접 읽는 방법
 
 > 작성일: 2026-09-16 · 관련: [neubla-isa.md](./neubla-isa.md), [model-to-binary-pipeline.md](./model-to-binary-pipeline.md)
-> 근거 파일: `example/asm/`, `paper/data/decode_o.py`, `paper/data/decode_o.txt`
+> 근거 파일: `example/asm/`, 원고 폴더의 `paper/data/_verify/decode_o.py` 와 `decode_o.txt` (이 저장소 바깥, `../paper/data/_verify/`)
 
 `nbc` 가 만든 `.o` 안에서 합성곱 명령이 실제로 어떤 채널 수와 타일 크기로 발행되었는지를 읽는 절차입니다.
 "패딩된 MACs 가 바이너리에 있는가" 를 확인하려고 만들었고, 답은 없다입니다. 명령이 지시한 연산량은 13 종 모델
@@ -54,7 +54,7 @@ nm -S example/sw50sc8_lw.o | grep 'wgt__n_conv2d_10_0'
 - `wgt__` 가중치는 출력 채널을 32 단위로 올린 크기입니다. 328 채널은 352 로 저장됩니다. 입력 채널은 원형 그대로.
 - `out__` DRAM 활성화 버퍼는 채널을 64 단위로 올린 크기입니다. 120 채널 152² 은 128 × 152² 바이트.
   예외는 모델 입력 `in__input_1_quantized` 가 3 채널 그대로인 것과 Concat 출력의 NCHW 사본 하나입니다.
-- 스크립트 `paper/data/object_padding.py` 가 12 종을 한 번에 봅니다.
+- 스크립트 `object_padding.py` 가 12 종을 한 번에 봅니다. 원고 폴더의 `paper/data/_archive/` 에 있습니다.
 
 ### 3.2 명령 텍스트를 얻는다 · 워크스테이션
 
@@ -125,7 +125,7 @@ enc "$(echo "$wl" | sed 's/mt(3,3,32,64)/mt(3,3,120,64)/')"     # 바이트 11,1
 
 ### 3.5 `.o` 만 읽는 해독기 · 로컬
 
-`paper/data/decode_o.py` 가 위 표로 `.text` 를 훑습니다.
+원고 폴더의 `paper/data/_verify/decode_o.py` 가 위 표로 `.text` 를 훑습니다.
 
 1. `load` 이면 목적지 레지스터에 레이아웃, R, S, C, M, DRAM 주소를 기록한다.
 2. `conv2d_bias` 이면 가중치 레지스터의 기록을 꺼내 R, S, C 를 얻고, 명령 자신의 M, H, W 를 읽는다.
